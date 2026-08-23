@@ -9,11 +9,13 @@ from minbpe import BasicTokenizer, RegexTokenizer, GPT4Tokenizer
 
 # a few strings to test the tokenizers on
 test_strings = [
-    "", # empty string
-    "?", # single character
-    "hello world!!!? (안녕하세요!) lol123 😉", # fun small string
-    "FILE:taylorswift.txt", # FILE: is handled as a special string in unpack()
+    "",  # empty string
+    "?",  # single character
+    "hello world!!!? (안녕하세요!) lol123 😉",  # fun small string
+    "FILE:taylorswift.txt",  # FILE: is handled as a special string in unpack()
 ]
+
+
 def unpack(text):
     # we do this because `pytest -v .` prints the arguments to console, and we don't
     # want to print the entire contents of the file, it creates a mess. So here we go.
@@ -24,6 +26,7 @@ def unpack(text):
         return contents
     else:
         return text
+
 
 specials_string = """
 <|endoftext|>Hello world this is one document
@@ -45,6 +48,7 @@ The ancestors of llamas are thought to have originated from the Great Plains of 
 <|fim_prefix|>In Aymara mythology, llamas are important beings. The Heavenly Llama is said to drink water from the ocean and urinates as it rains.[6] According to Aymara eschatology,<|fim_suffix|> where they come from at the end of time.[6]<|fim_middle|> llamas will return to the water springs and ponds<|endofprompt|>
 """.strip()
 
+
 # -----------------------------------------------------------------------------
 # tests
 
@@ -58,6 +62,7 @@ def test_encode_decode_identity(tokenizer_factory, text):
     decoded = tokenizer.decode(ids)
     assert text == decoded
 
+
 # test that our tokenizer matches the official GPT-4 tokenizer
 @pytest.mark.parametrize("text", test_strings)
 def test_gpt4_tiktoken_equality(text):
@@ -68,6 +73,7 @@ def test_gpt4_tiktoken_equality(text):
     gpt4_tokenizer_ids = tokenizer.encode(text)
     assert gpt4_tokenizer_ids == tiktoken_ids
 
+
 # test the handling of special tokens
 def test_gpt4_tiktoken_equality_special_tokens():
     tokenizer = GPT4Tokenizer()
@@ -75,6 +81,7 @@ def test_gpt4_tiktoken_equality_special_tokens():
     tiktoken_ids = enc.encode(specials_string, allowed_special="all")
     gpt4_tokenizer_ids = tokenizer.encode(specials_string, allowed_special="all")
     assert gpt4_tokenizer_ids == tiktoken_ids
+
 
 # reference test to add more tests in the future
 @pytest.mark.parametrize("tokenizer_factory", [BasicTokenizer, RegexTokenizer])
@@ -101,10 +108,11 @@ def test_wikipedia_example(tokenizer_factory):
     """
     tokenizer = tokenizer_factory()
     text = "aaabdaaabac"
-    tokenizer.train(text, 256 + 3)
+    tokenizer.train(text, 256 + 3, True)
     ids = tokenizer.encode(text)
     assert ids == [258, 100, 258, 97, 99]
     assert tokenizer.decode(tokenizer.encode(text)) == text
+
 
 @pytest.mark.parametrize("special_tokens", [{}, special_tokens])
 def test_save_load(special_tokens):
@@ -130,6 +138,7 @@ def test_save_load(special_tokens):
     # delete the temporary files
     for file in ["test_tokenizer_tmp.model", "test_tokenizer_tmp.vocab"]:
         os.remove(file)
+
 
 if __name__ == "__main__":
     pytest.main()

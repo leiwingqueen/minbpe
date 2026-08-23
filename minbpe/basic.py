@@ -60,7 +60,33 @@ class BasicTokenizer(Tokenizer):
            - verbose 为 True 时打印一下这次合并的信息，方便观察学到的 token
         5. 把 merges / vocab 存回 self.merges / self.vocab
         """
-        raise NotImplementedError("TODO: implement BasicTokenizer.train")
+        min_vocab_size = 256
+        assert vocab_size >= min_vocab_size
+        # 因为每合并一次，就会增加一个新的vocab
+        num_merges = vocab_size - min_vocab_size
+        ids = list(text.encode('utf-8'))
+        token_id = min_vocab_size
+        merges = {}
+        vocab = {}
+        for i in range(min_vocab_size):
+            vocab[i] = bytes([i])
+        for i in range(num_merges):
+            stats = get_stats(ids)
+            # 获取次数最多的pair
+            max_count = 0
+            max_pair = ()
+            for pair, count in stats.items():
+                if count > max_count:
+                    max_count = count
+                    max_pair = (pair[0], pair[1])
+            ids = merge(ids, max_pair, token_id)
+            merges[max_pair] = token_id
+            vocab[token_id] = vocab[max_pair[0]] + vocab[max_pair[1]]
+            if verbose:
+                print(f"add new merge rule:{max_pair}={token_id}.vocab:{token_id}:{vocab[token_id]}")
+            token_id += 1
+        self.merges = merges
+        self.vocab = vocab
 
     def decode(self, ids):
         """
@@ -91,4 +117,11 @@ class BasicTokenizer(Tokenizer):
            - 否则 idx = self.merges[pair]；ids = merge(ids, pair, idx)
         3. 返回 ids
         """
+        ids = list(text.encode('utf-8'))
+        while len(ids) >= 2:
+            stats = get_stats(ids)
+            min_token_id = float("inf")
+            for pair, _ in stats.items():
+                if pair in self.merges
+
         raise NotImplementedError("TODO: implement BasicTokenizer.encode")
