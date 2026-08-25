@@ -114,6 +114,16 @@ def test_wikipedia_example(tokenizer_factory):
     assert tokenizer.decode(tokenizer.encode(text)) == text
 
 
+# 测试basic tokenizer
+def test_basic_tokenizer():
+    tokenizer = BasicTokenizer()
+    text = unpack("FILE:taylorswift.txt")
+    tokenizer.train(text, 2048, True)
+    ids = tokenizer.encode(text)
+    for id in ids:
+        print(f"|{tokenizer.vocab[id]}|")
+
+
 @pytest.mark.parametrize("special_tokens", [{}, special_tokens])
 def test_save_load(special_tokens):
     # take a bit more complex piece of text and train the tokenizer, chosen at random
