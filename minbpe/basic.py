@@ -123,11 +123,11 @@ class BasicTokenizer(Tokenizer):
         while len(ids) >= 2:
             stats = get_stats(ids)
             min_token_id = float("inf")
-            min_pair = {}
+            min_pair = ()
             for pair, _ in stats.items():
                 if pair in self.merges and self.merges[pair] < min_token_id:
                     min_token_id = self.merges[pair]
-                    min_pair = {pair[0], pair[1]}
+                    min_pair = (pair[0], pair[1])
             if min_pair not in self.merges:
                 break
             ids = merge(ids, min_pair, min_token_id)
