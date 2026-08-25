@@ -97,7 +97,9 @@ class BasicTokenizer(Tokenizer):
         2. .decode("utf-8", errors="replace") 转回字符串
            （必须带 errors="replace"，因为任意 id 序列拼出来的字节不一定是合法 utf-8）
         """
-        raise NotImplementedError("TODO: implement BasicTokenizer.decode")
+        text_bytes = b"".join(self.vocab[id] for id in ids)
+        text = text_bytes.decode("utf-8", errors="replace")
+        return text
 
     def encode(self, text):
         """
