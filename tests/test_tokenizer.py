@@ -120,9 +120,8 @@ def test_basic_tokenizer():
     text = unpack("FILE:taylorswift.txt")
     tokenizer.train(text, 2048, True)
     ids = tokenizer.encode(text)
-    for id in ids:
-        print(f"|{tokenizer.vocab[id]}|")
-
+    split_token_text = b"|".join(tokenizer.vocab[id] for id in ids)
+    print(split_token_text)
 
 @pytest.mark.parametrize("special_tokens", [{}, special_tokens])
 def test_save_load(special_tokens):
