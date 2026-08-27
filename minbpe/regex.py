@@ -121,7 +121,8 @@ class RegexTokenizer(Tokenizer):
             merges[max_pair] = token_id
             vocab[token_id] = vocab[max_pair[0]] + vocab[max_pair[1]]
             if verbose:
-                print(f"merge {i + 1}/{num_merges}: {pair} -> {idx} ({vocab[idx]}) had {stats[pair]} occurrences")
+                print(
+                    f"merge {i + 1}/{num_merges}: {max_pair} -> {token_id} ({vocab[token_id]}) had {stats[max_pair]} occurrences")
             token_id += 1
         self.merges = merges
         self.vocab = vocab
@@ -169,18 +170,35 @@ class RegexTokenizer(Tokenizer):
         小坑：min 在没有任何可用 merge 时，所有 pair 的 key 都是 inf，
               它会随便返回第一个 pair —— 所以必须靠 `pair not in self.merges` 跳出。
         """
-        raise NotImplementedError("TODO Step 2: implement RegexTokenizer._encode_chunk")
+        ids = list(text_bytes)
+        while len(ids) >= 2:
+            stats = get_stats(ids)
+            min_pair = ()
+            min_token_id = float("inf")
+            for pair, _ in stats.items():
+                if pair in self.merges and self.merges[pair] < min_token_id:
+                    min_token_id = self.merges[pair]
+                    min_pair = (pair[0], pair[1])
+            if len(min_pair) == 0:
+                break
+            ids = merge(ids, min_pair, min_token_id)
+        return ids
 
     def encode_ordinary(self, text):
         """
-        TODO(Step 2): Encoding that ignores any special tokens.
+        (Step 2): Encoding that ignores any special tokens.
 
         步骤提示：
           1. text_chunks = re.findall(self.compiled_pattern, text)
           2. 对每个 chunk：chunk.encode("utf-8") -> self._encode_chunk(...)
           3. 把各个 chunk 的结果依次 extend 到一个 ids 列表里返回
         """
-        raise NotImplementedError("TODO Step 2: implement RegexTokenizer.encode_ordinary")
+        text_chunks = re.findall(self.compiled_pattern, text)
+        ids = []
+        for chunk in text_chunks:
+            chunk_ids = self._encode_chunk(chunk.encode("utf-8"))
+            ids.extend(chunk_ids)
+        return ids
 
     def encode(self, text, allowed_special="none_raise"):
         """
