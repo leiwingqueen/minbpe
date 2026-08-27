@@ -46,7 +46,6 @@ Unlike BasicTokenizer:
 import regex as re
 from .base import Tokenizer, get_stats, merge
 
-
 # the main GPT text split patterns, see
 # https://github.com/openai/tiktoken/blob/main/tiktoken_ext/openai_public.py
 GPT2_SPLIT_PATTERN = r"""'(?:[sdmt]|ll|ve|re)| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
@@ -69,7 +68,7 @@ class RegexTokenizer(Tokenizer):
 
     def train(self, text, vocab_size, verbose=False):
         """
-        TODO(Step 2): 训练 BPE。
+        (Step 2): 训练 BPE。
         和 BasicTokenizer.train 的流程完全一致，只是多了"先切 chunk"这一步。
 
         步骤提示：
@@ -97,7 +96,35 @@ class RegexTokenizer(Tokenizer):
           - 不要用 self.vocab = self._build_vocab()，那是给 load() 用的
           - vocab[pair[0]] 是 bytes，相加是 bytes 拼接，不是数字相加
         """
-        raise NotImplementedError("TODO Step 2: implement RegexTokenizer.train")
+        min_vocab_size = 256
+        assert vocab_size >= min_vocab_size
+        num_merges = vocab_size - min_vocab_size
+        text_chunks = re.findall(self.compiled_pattern, text)
+        ids = []
+        for chunk in text_chunks:
+            ids.append(list(chunk.encode("uft-8")))
+        merges = {}
+        vocab = {idx: bytes([idx]) for idx in range(256)}  # int -> bytes
+        token_id = min_vocab_size
+        for i in range(num_merges):
+            stats = {}
+            for chunk_ids in ids:
+                get_stats(chunk_ids, stats)
+            max_pair = ()
+            max_cnt = 0
+            for pair, cnt in stats.items():
+                if cnt > max_cnt:
+                    max_cnt = cnt
+                    max_pair = (pair[0], pair[1])
+            # python这写法总感觉很骚
+            ids = [merge(chunk_ids, max_pair, token_id) for chunk_ids in ids]
+            merges[max_pair] = token_id
+            vocab[token_id] = vocab[max_pair[0]] + vocab[max_pair[1]]
+            if verbose:
+                print(f"merge {i + 1}/{num_merges}: {pair} -> {idx} ({vocab[idx]}) had {stats[pair]} occurrences")
+            token_id += 1
+        self.merges = merges
+        self.vocab = vocab
 
     def register_special_tokens(self, special_tokens):
         # special_tokens is a dictionary of str -> int
