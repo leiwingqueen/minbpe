@@ -102,7 +102,7 @@ class RegexTokenizer(Tokenizer):
         text_chunks = re.findall(self.compiled_pattern, text)
         ids = []
         for chunk in text_chunks:
-            ids.append(list(chunk.encode("uft-8")))
+            ids.append(list(chunk.encode("utf-8")))
         merges = {}
         vocab = {idx: bytes([idx]) for idx in range(256)}  # int -> bytes
         token_id = min_vocab_size
