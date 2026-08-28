@@ -149,11 +149,20 @@ class RegexTokenizer(Tokenizer):
         小坑：为什么必须 errors="replace"？
           因为单个 token 可能是某个多字节 UTF-8 字符的一半，直接 decode 会抛异常。
         """
-        raise NotImplementedError("TODO Step 2: implement RegexTokenizer.decode")
+        part_bytes = []
+        for idx in ids:
+            if idx in self.vocab:
+                part_bytes.append(self.vocab[idx])
+            elif idx in self.inverse_special_tokens:
+                part_bytes.append(self.inverse_special_tokens[idx].encode("utf-8"))
+            else:
+                raise ValueError(f"invalid token id:{idx}")
+        text_bytes = b"".join(part_bytes)
+        return text_bytes.decode("utf-8", errors="replace")
 
     def _encode_chunk(self, text_bytes):
         """
-        TODO(Step 2): 对【单个 chunk 的字节串】做 BPE 编码，返回 token ids。
+        (Step 2): 对【单个 chunk 的字节串】做 BPE 编码，返回 token ids。
         这部分和 BasicTokenizer.encode 的循环体一模一样，可以直接搬过来。
 
         步骤提示：
@@ -208,7 +217,7 @@ class RegexTokenizer(Tokenizer):
         this is the default tiktoken behavior right now as well
         any other behavior is either annoying, or a major footgun
 
-        TODO(Step 4，可选)：先做 Step 2 时，可以直接 `return self.encode_ordinary(text)`
+        (Step 4，可选)：先做 Step 2 时，可以直接 `return self.encode_ordinary(text)`
         跑通测试，等做 Step 4 再回来补完整逻辑。
 
         步骤提示：
@@ -227,4 +236,35 @@ class RegexTokenizer(Tokenizer):
              - part in special -> ids.append(special[part])      # 直接用它的 id
              - 否则            -> ids.extend(self.encode_ordinary(part))
         """
-        raise NotImplementedError("TODO Step 2/4: implement RegexTokenizer.encode")
+        special = None
+        if allowed_special == "all":
+            special = self.special_tokens
+        elif allowed_special == "none":
+            special = {}
+        elif allowed_special == "none_raise":
+            special = {}
+            assert all(token not in text for token in self.special_tokens)
+        elif isinstance(allowed_special, set):
+            special = {k: v for k, v in self.special_tokens.items() if k in allowed_special}
+        else:
+            raise ValueError(f"allowed_special={allowed_special} not understood")
+        if not special:
+            return self.encode_ordinary(text)
+        # otherwise, we have to be careful with potential special tokens in text
+        # we handle special tokens by splitting the text
+        # based on the occurrence of any exact match with any of the special tokens
+        # we can use re.split for this. note that surrounding the pattern with ()
+        # makes it into a capturing group, so the special tokens will be included
+        special_pattern = "(" + "|".join(re.escape(k) for k in special) + ")"
+        special_chunks = re.split(special_pattern, text)
+        # now all the special characters are separated from the rest of the text
+        # all chunks of text are encoded separately, then results are joined
+        ids = []
+        for part in special_chunks:
+            if part in special:
+                # this is a special token, encode it separately as a special case
+                ids.append(special[part])
+            else:
+                # this is an ordinary sequence, encode it normally
+                ids.extend(self.encode_ordinary(part))
+        return ids
