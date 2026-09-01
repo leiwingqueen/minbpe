@@ -1,11 +1,19 @@
-# 字节、合并、Token
+# nn zero to hero系列-tokenizer实现
+
+
+
+## 00 · 前言
+
+近几年基于大模型的各种智能体和工具百花齐放，在感慨大模型发展迅猛的同时，又感慨工具的发展过于迅猛，有一种一个工具还没学透，新的工具又冒出来了。我个人倾向于学习一些比较底层的原理，一是这方面的原理一般不会轻易变化，另外一方面也方便让我理解上层的一些设计。最近看完karpathy大神的课程发现不少的内容还是会比较模糊，计划跟着教程从零开始训练一个LLM，那么第一篇就是先尝试实现一个tokenizer。
+
+
 
 > 手写 BPE 分词器的分享记录 —— 两个分支、四个方法、以及一路踩到的坑。
 >
-> - 仓库：[karpathy/minbpe](https://github.com/karpathy/minbpe)
+> - 仓库：[leiwingqueen/minbpe](https://github.com/leiwingqueen/minbpe) （原仓库 https://github.com/karpathy/minbpe）
 > - 实现分支：`exercise/basic-tokenizer`、`exercise/regex-tokenizer`
 > - 测试：22 passed
-> - 可交互版本（含 BPE 实验台）：https://claude.ai/code/artifact/3644f448-bf2c-4418-8722-5537c681d872
+> - 在线 BPE 实验台：https://claude.ai/code/artifact/d8e4605f-dbb1-4b30-b770-40d9886ef307
 
 | | |
 |---|---|
@@ -95,9 +103,9 @@ for i in range(num_merges):
 
 ## 04 · 实验台
 
-可交互的实验台在 artifact 版本里：输入文本 → 正则切分 → BPE 合并 → token 序列，可以拖动合并次数、开关正则切分。
+做了一个可交互的实验台：输入文本 → 正则切分 → BPE 合并 → token 序列，可以拖动合并次数、开关正则切分、显示 token id。
 
-https://claude.ai/code/artifact/3644f448-bf2c-4418-8722-5537c681d872
+**https://claude.ai/code/artifact/d8e4605f-dbb1-4b30-b770-40d9886ef307**
 
 三件值得试的事：
 
