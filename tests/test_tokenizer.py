@@ -146,6 +146,9 @@ def test_tiktoken():
     ids = enc.encode("hello world!!!? (안녕하세요!) lol123 😉")
     text = enc.decode(ids)  # get the same text back
     print(text)
+    for k, v in enc._mergeable_ranks.items():
+        print(f"key:{k},value:{v},type key: {type(k)}")
+
 
 
 if __name__ == "__main__":
