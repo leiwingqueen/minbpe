@@ -91,7 +91,7 @@ def recover_merges(mergeable_ranks):
     merges = {}
     for token, rank in mergeable_ranks.items():
         if len(token) == 1:
-            continue # skip raw bytes
+            continue  # skip raw bytes
         pair = tuple(bpe(mergeable_ranks, token, max_rank=rank))
         assert len(pair) == 2
         # recover the integer ranks of the pair
@@ -100,6 +100,7 @@ def recover_merges(mergeable_ranks):
         merges[(ix0, ix1)] = rank
 
     return merges
+
 
 GPT4_SPLIT_PATTERN = r"""'(?i:[sdmt]|ll|ve|re)|[^\r\n\p{L}\p{N}]?+\p{L}+|\p{N}{1,3}| ?[^\s\p{L}\p{N}]++[\r\n]*|\s*[\r\n]|\s+(?!\S)|\s+"""
 GPT4_SPECIAL_TOKENS = {
@@ -110,12 +111,13 @@ GPT4_SPECIAL_TOKENS = {
     '<|endofprompt|>': 100276
 }
 
+
 class GPT4Tokenizer(RegexTokenizer):
     """Lightweight wrapper on RegexTokenizer that matches GPT-4's tokenizer."""
 
     def __init__(self):
         """
-        TODO(Step 3): 从 tiktoken 加载 cl100k_base，把状态灌进本对象。
+        (Step 3): 从 tiktoken 加载 cl100k_base，把状态灌进本对象。
 
         步骤提示：
           1. super().__init__(pattern=GPT4_SPLIT_PATTERN)
@@ -141,11 +143,21 @@ class GPT4Tokenizer(RegexTokenizer):
           - _mergeable_ranks 是 tiktoken 的私有属性，跨版本可能改名，
             但这里就是拿它，没有公开 API。
         """
-        raise NotImplementedError("TODO Step 3: implement GPT4Tokenizer.__init__")
+        super().__init__(pattern=GPT4_SPLIT_PATTERN)
+        enc = tiktoken.get_encoding("cl100k_base")
+        mergeable_ranks = enc._mergeable_ranks
+        self.merges = recover_merges(mergeable_ranks)
+        self.byte_shuffle = {i: mergeable_ranks[bytes([i])] for i in range(256)}
+        self.inverse_byte_shuffle = {v: k for k, v in self.byte_shuffle.items()}
+        # 构建vocab，直接在这里做byte shuffle，这样decode的时候可以少做一次转换
+        vocab = {idx: self.byte_shuffle[idx] for idx in range(256)}
+        for (p0, p1), token_id in self.merges.items():
+            vocab[token_id] = vocab[p0] + vocab[p1]
+        self.register_special_tokens(GPT4_SPECIAL_TOKENS)
 
     def _encode_chunk(self, text_bytes):
         """
-        TODO(Step 3): 编码单个 chunk，比父类多一步“字节置换”。
+        (Step 3): 编码单个 chunk，比父类多一步“字节置换”。
 
         步骤提示：
           1. text_bytes = bytes(self.byte_shuffle[b] for b in text_bytes)
@@ -158,59 +170,68 @@ class GPT4Tokenizer(RegexTokenizer):
           因为 0..255 的置换仍然落在 0..255 里，是个双射，
           所以结果依然是一个合法的 bytes 对象。
         """
-        raise NotImplementedError("TODO Step 3: implement GPT4Tokenizer._encode_chunk")
+        text_bytes = bytes(self.byte_shuffle[b] for b in text_bytes)
+        ids = super()._encode_chunk(text_bytes)
+        return ids
 
-    def decode(self, ids):
-        """
-        TODO(Step 3): 解码，比父类多一步“字节反置换”。
 
-        步骤提示：
-          1. text_bytes = b"".join(self.vocab[idx] for idx in ids)
-          2. text_bytes = bytes(self.inverse_byte_shuffle[b] for b in text_bytes)
-             —— 把置换空间里的字节还原成真实字节，顺序不能和上一步反过来
-          3. return text_bytes.decode("utf-8", errors="replace")
+def decode(self, ids):
+    """
+    (Step 3): 解码，比父类多一步“字节反置换”。
 
-        小坑：
-          - 这里没有走父类 decode，因为父类不知道 byte_shuffle 的存在。
-          - errors="replace" 的理由和 Step 2 一样：单个 token 可能是某个
-            多字节 UTF-8 字符的一半。
-        """
-        raise NotImplementedError("TODO Step 3: implement GPT4Tokenizer.decode")
+    步骤提示：
+      1. text_bytes = b"".join(self.vocab[idx] for idx in ids)
+      2. text_bytes = bytes(self.inverse_byte_shuffle[b] for b in text_bytes)
+         —— 把置换空间里的字节还原成真实字节，顺序不能和上一步反过来
+      3. return text_bytes.decode("utf-8", errors="replace")
 
-    # this is a pretrained tokenizer, it is not intended to be trained
-    def train(self, text, vocab_size, verbose=False):
-        raise NotImplementedError
+    小坑：
+      - 这里没有走父类 decode，因为父类不知道 byte_shuffle 的存在。
+      - errors="replace" 的理由和 Step 2 一样：单个 token 可能是某个
+        多字节 UTF-8 字符的一半。
+    """
+    text_bytes = b"".join(self.vocab[idx] for idx in ids)
+    text_bytes = bytes(self.inverse_byte_shuffle[b] for b in text_bytes)
+    return text_bytes.decode("utf-8", errors="replace")
 
-    # save/load would require some thought.
-    # we'd have to change save/load of base to add support for byte_shuffle...
-    # alternatively, we could move byte_shuffle to base class, but that would
-    # mean that we're making ugly our beautiful Tokenizer just to support
-    # the GPT-4 tokenizer and its weird historical quirks around byte_shuffle.
-    def save(self, file_prefix):
-        raise NotImplementedError("GPT4Tokenizer cannot be saved.")
 
-    def load(self, model_file):
-        raise NotImplementedError("GPT4Tokenizer cannot be loaded.")
+# this is a pretrained tokenizer, it is not intended to be trained
+def train(self, text, vocab_size, verbose=False):
+    raise NotImplementedError
 
-    def save_vocab(self, vocab_file):
-        # just for visualization purposes let's output the GPT-4 tokens
-        # in the exact same format as the base class would.
-        # simple run as:
-        # python -c "from minbpe import GPT4Tokenizer; GPT4Tokenizer().save_vocab('gpt4.vocab')"
-        from .base import render_token
-        # build vocab being mindful of the byte shuffle
-        vocab = {idx: bytes([self.inverse_byte_shuffle[idx]]) for idx in range(256)}
-        for (p0, p1), idx in self.merges.items():
-            vocab[idx] = vocab[p0] + vocab[p1]
-        # now merge the shuffled bytes and write to file
-        inverted_merges = {idx: pair for pair, idx in self.merges.items()}
-        with open(vocab_file, "w", encoding="utf-8") as f:
-            for idx, token in vocab.items():
-                s = render_token(token)
-                if idx in inverted_merges:
-                    idx0, idx1 = inverted_merges[idx]
-                    s0 = render_token(vocab[idx0])
-                    s1 = render_token(vocab[idx1])
-                    f.write(f"[{s0}][{s1}] -> [{s}] {idx}\n")
-                else:
-                    f.write(f"[{s}] {idx}\n")
+
+# save/load would require some thought.
+# we'd have to change save/load of base to add support for byte_shuffle...
+# alternatively, we could move byte_shuffle to base class, but that would
+# mean that we're making ugly our beautiful Tokenizer just to support
+# the GPT-4 tokenizer and its weird historical quirks around byte_shuffle.
+def save(self, file_prefix):
+    raise NotImplementedError("GPT4Tokenizer cannot be saved.")
+
+
+def load(self, model_file):
+    raise NotImplementedError("GPT4Tokenizer cannot be loaded.")
+
+
+def save_vocab(self, vocab_file):
+    # just for visualization purposes let's output the GPT-4 tokens
+    # in the exact same format as the base class would.
+    # simple run as:
+    # python -c "from minbpe import GPT4Tokenizer; GPT4Tokenizer().save_vocab('gpt4.vocab')"
+    from .base import render_token
+    # build vocab being mindful of the byte shuffle
+    vocab = {idx: bytes([self.inverse_byte_shuffle[idx]]) for idx in range(256)}
+    for (p0, p1), idx in self.merges.items():
+        vocab[idx] = vocab[p0] + vocab[p1]
+    # now merge the shuffled bytes and write to file
+    inverted_merges = {idx: pair for pair, idx in self.merges.items()}
+    with open(vocab_file, "w", encoding="utf-8") as f:
+        for idx, token in vocab.items():
+            s = render_token(token)
+            if idx in inverted_merges:
+                idx0, idx1 = inverted_merges[idx]
+                s0 = render_token(vocab[idx0])
+                s1 = render_token(vocab[idx1])
+                f.write(f"[{s0}][{s1}] -> [{s}] {idx}\n")
+            else:
+                f.write(f"[{s}] {idx}\n")
