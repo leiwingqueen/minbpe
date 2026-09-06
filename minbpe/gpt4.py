@@ -150,9 +150,10 @@ class GPT4Tokenizer(RegexTokenizer):
         self.byte_shuffle = {i: mergeable_ranks[bytes([i])] for i in range(256)}
         self.inverse_byte_shuffle = {v: k for k, v in self.byte_shuffle.items()}
         # 构建vocab，直接在这里做byte shuffle，这样decode的时候可以少做一次转换
-        vocab = {idx: self.byte_shuffle[idx] for idx in range(256)}
+        vocab = {idx: bytes([idx]) for idx in range(256)}
         for (p0, p1), token_id in self.merges.items():
             vocab[token_id] = vocab[p0] + vocab[p1]
+        self.vocab = vocab
         self.register_special_tokens(GPT4_SPECIAL_TOKENS)
 
     def _encode_chunk(self, text_bytes):
